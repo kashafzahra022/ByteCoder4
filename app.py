@@ -13,6 +13,7 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate, make_msgid
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -99,35 +100,37 @@ def send_otp_email(receiver_email, otp_code):
     load_dotenv()
     CENTRAL_SENDER = os.environ.get("SMTP_EMAIL")
     CENTRAL_PASSWORD = os.environ.get("SMTP_PASSWORD")
+    if not CENTRAL_SENDER or not CENTRAL_PASSWORD:
+        st.error("SMTP credentials are not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env")
+        return False
 
-    message = MIMEMultipart()
-    
-    message = MIMEMultipart()
-    message["From"] = f"Research Vault Security <{CENTRAL_SENDER}>"
-    message["To"] = receiver_email  
-    message["Subject"] = f"🔑 {otp_code} is your Research Vault Verification Code"
-    
-    body = f"""
-    Hello,
-    
-    You are trying to log in to the Additive Manufacturing Composite Analyzer.
-    
-    Your secure Verification Code is: {otp_code}
-    
-    If you did not request this, please ignore this email.
-    
-    Regards,
-    Research Hub Security Team
-    """
-    message.attach(MIMEText(body, "plain"))
-    
+    # build multipart/alternative message with plain and html
+    message = MIMEMultipart("alternative")
+    message["From"] = CENTRAL_SENDER
+    message["To"] = receiver_email
+    message["Subject"] = "Your Research Vault Verification Code"
+    message["Reply-To"] = CENTRAL_SENDER
+    message["Date"] = formatdate(localtime=True)
+    message["Message-ID"] = make_msgid()
+
+    plain_body = f"Hello,\n\nYour verification code is: {otp_code}\n\nIf you did not request this, ignore this email.\n\nRegards,\nResearch Hub Security Team"
+    html_body = f"""<html><body><p>Hello,</p><p><strong>Your verification code is: <span style=\"font-size:18px\">{otp_code}</span></strong></p><p>If you did not request this, please ignore this email.</p><p>Regards,<br/>Research Hub Security Team</p></body></html>"""
+
+    message.attach(MIMEText(plain_body, "plain"))
+    message.attach(MIMEText(html_body, "html"))
+
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=30)
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(CENTRAL_SENDER, CENTRAL_PASSWORD)
         server.sendmail(CENTRAL_SENDER, receiver_email, message.as_string())
         server.quit()
         return True
+    except smtplib.SMTPException as e:
+        st.error(f"Failed to deliver security code (SMTP error). Error details: {e}")
+        return False
     except Exception as e:
         st.error(f"Failed to deliver security code. Error details: {e}")
         return False
