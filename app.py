@@ -693,7 +693,8 @@ if not st.session_state.logged_in:
         otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
 
         if st.button("Confirm & Login", use_container_width=True):
-            if otp_val == st.session_state.sent_otp:
+            entered_code = otp_val.strip() if otp_val else ""
+            if entered_code == st.session_state.sent_otp:
                 st.session_state.logged_in = True
                 st.session_state.username = st.session_state.temp_user_data['username']
                 st.session_state.user_id = st.session_state.temp_user_data['id']
