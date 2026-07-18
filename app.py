@@ -139,7 +139,7 @@ def clear_otp(email):
 
 # SMTP Email Sender for OTP Verification
 def send_otp_email(receiver_email, otp_code):
-    load_dotenv()
+    load_dotenv(override=True)
     CENTRAL_SENDER = os.environ.get("SMTP_EMAIL")
     CENTRAL_PASSWORD = os.environ.get("SMTP_PASSWORD")
     if not CENTRAL_SENDER or not CENTRAL_PASSWORD:
