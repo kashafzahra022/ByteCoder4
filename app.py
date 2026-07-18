@@ -95,6 +95,48 @@ def check_email_exists(email):
         return {"id": user[0], "username": user[1], "email": user[2]}
     return None
 
+# --- OTP STORAGE IN DATABASE (survives server restarts, unlike session_state) ---
+def init_otp_table():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS otp_codes (
+            email TEXT PRIMARY KEY,
+            otp_code TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_otp(email, otp_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO otp_codes (email, otp_code, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(email) DO UPDATE SET otp_code=excluded.otp_code, created_at=CURRENT_TIMESTAMP
+    ''', (email, otp_code))
+    conn.commit()
+    conn.close()
+
+def verify_otp(email, otp_code):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT otp_code FROM otp_codes WHERE email = ?', (email,))
+    row = cursor.fetchone()
+    conn.close()
+    if row and row[0] == otp_code:
+        return True
+    return False
+
+def clear_otp(email):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM otp_codes WHERE email = ?', (email,))
+    conn.commit()
+    conn.close()
+
 # SMTP Email Sender for OTP Verification
 def send_otp_email(receiver_email, otp_code):
     load_dotenv()
@@ -108,7 +150,7 @@ def send_otp_email(receiver_email, otp_code):
     message = MIMEMultipart("alternative")
     message["From"] = CENTRAL_SENDER
     message["To"] = receiver_email
-    message["Subject"] = "Your Research Vault Verification Code"
+    message["Subject"] = f"Your Research Vault Verification Code: {otp_code}"
     message["Reply-To"] = CENTRAL_SENDER
     message["Date"] = formatdate(localtime=True)
     message["Message-ID"] = make_msgid()
@@ -312,6 +354,7 @@ def automatic_extractor(text):
     return title, authors, abstract, keywords, pub_year
 
 init_db()
+init_otp_table()
 
 # --- STREAMLIT CONFIG ---
 st.set_page_config(page_title="AddiComp Research Hub", page_icon="🔬", layout="wide")
@@ -673,8 +716,10 @@ if not st.session_state.logged_in:
                 user_info = check_email_exists(google_email)
                 if user_info:
                     generated_otp = str(random.randint(100000, 999999))
+                    save_otp(google_email, generated_otp)
                     st.session_state.sent_otp = generated_otp
                     st.session_state.temp_user_data = user_info
+                    st.session_state.pending_email = google_email
                     with st.spinner("Delivering secure access code..."):
                         if send_otp_email(google_email, generated_otp):
                             st.session_state.auth_step = 'otp_verify'
@@ -693,11 +738,13 @@ if not st.session_state.logged_in:
         otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
 
         if st.button("Confirm & Login", use_container_width=True):
-            entered_code = otp_val.strip() if otp_val else ""
-            if entered_code == st.session_state.sent_otp:
+            pending_email = st.session_state.get('pending_email')
+            if pending_email and verify_otp(pending_email, otp_val):
+                user_info = check_email_exists(pending_email)
+                clear_otp(pending_email)
                 st.session_state.logged_in = True
-                st.session_state.username = st.session_state.temp_user_data['username']
-                st.session_state.user_id = st.session_state.temp_user_data['id']
+                st.session_state.username = user_info['username']
+                st.session_state.user_id = user_info['id']
                 st.session_state.auth_step = 'welcome'
                 st.success("Secure verification completed successfully.")
                 st.balloons()
