@@ -243,6 +243,19 @@ def get_filtered_papers(search_query, search_by):
     conn.close()
     return data
 
+
+def get_paper_display_details(paper):
+    title = paper.get('title') or paper.get('name') or 'Untitled Paper'
+    authors = paper.get('authors') or 'Unknown Author'
+    abstract = paper.get('abstract') or ''
+    source_file = paper.get('source_file') or paper.get('name') or 'Unknown file'
+    return {
+        'title': title,
+        'authors': authors,
+        'abstract': abstract,
+        'source_file': source_file,
+    }
+
 # --- SMART AI HEURISTIC EXTRACTOR ---
 def automatic_extractor(text):
     lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -940,8 +953,12 @@ else:
         if db_papers:
             st.markdown(f"**Found {len(db_papers)} paper(s)** inside your vault:")
             for paper in db_papers:
-                with st.expander(f"[{paper['pub_year']}] - {paper['title']}"):
-                    st.write(f"**Abstract:**\n{paper['abstract']}")
+                details = get_paper_display_details(dict(paper))
+                with st.expander(f"[{paper['pub_year']}] - {details['title']}"):
+                    st.write(f"**File:** {details['source_file']}")
+                    st.write(f"**Authors:** {details['authors']}")
+                    st.write(f"**Title:** {details['title']}")
+                    st.write(f"**Abstract:**\n{details['abstract']}")
         else:
             st.warning("No papers match your query inside the database.")
 
