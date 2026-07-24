@@ -70,25 +70,54 @@ def init_db():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+
+def normalize_lookup_value(value):
+    return (value or "").strip().casefold()
+
+
+def normalize_username(username):
+    return (username or "").strip()
+
+
+def normalize_email(email):
+    return (email or "").strip().lower()
+
 # Authentication functions
 def register_user(username, email, password, full_name="", organization="", role=""):
+    normalized_username = normalize_username(username)
+    normalized_email = normalize_email(email)
+
+    if not normalized_username or not normalized_email or not password:
+        return False
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM users
+        WHERE lower(trim(username)) = ? OR lower(trim(email)) = ?
+    ''', (normalize_lookup_value(normalized_username), normalize_lookup_value(normalized_email)))
+    if cursor.fetchone():
+        conn.close()
+        return False
+
     try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO users (username, email, password, full_name, organization, role)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (username, email, hash_password(password), full_name, organization, role))
+        ''', (normalized_username, normalized_email, hash_password(password), full_name.strip(), organization.strip(), role.strip()))
         conn.commit()
         conn.close()
         return True
     except sqlite3.IntegrityError:
+        conn.close()
         return False
 
+
 def check_email_exists(email):
+    normalized_email = normalize_email(email)
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute('SELECT id, username, email FROM users WHERE email = ?', (email,))
+    cursor.execute('SELECT id, username, email FROM users WHERE lower(trim(email)) = ?', (normalize_lookup_value(normalized_email),))
     user = cursor.fetchone()
     conn.close()
     if user:
@@ -375,13 +404,14 @@ if 'sent_otp' not in st.session_state:
 
 # Custom sign-in function
 def login_user(username_or_email, password):
+    normalized_value = normalize_lookup_value(username_or_email)
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     hashed = hash_password(password)
     cursor.execute('''
         SELECT id, username, email FROM users 
-        WHERE (username = ? OR email = ?) AND password = ?
-    ''', (username_or_email, username_or_email, hashed))
+        WHERE ((lower(trim(username)) = ?) OR (lower(trim(email)) = ?)) AND password = ?
+    ''', (normalized_value, normalized_value, hashed))
     user = cursor.fetchone()
     conn.close()
     return user
@@ -666,7 +696,7 @@ if not st.session_state.logged_in:
                     st.session_state.auth_step = 'welcome'
                     st.rerun()
                 else:
-                    st.error("Username or email already exists")
+                    st.error("This username or email is already in use. Please try a different one.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.auth_step == 'signin':
