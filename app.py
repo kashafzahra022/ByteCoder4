@@ -551,18 +551,9 @@ AUTH_THEME_CSS = """
     border: none !important;
     padding: 12px 18px !important;
     box-shadow: 0 10px 28px rgba(37,99,235,0.34) !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
-}
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 14px 34px rgba(124,58,237,0.42) !important;
-}
-
-.secondary-btn button {
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(255,255,255,0.18) !important;
-    box-shadow: none !important;
-}
+        transition: box-shadow 0.15s ease !important;
+    }
+    .stButton > button:hover {
 
 .back-link button {
     background: transparent !important;
@@ -992,7 +983,8 @@ else:
                     bargap=0.2,
                     margin=dict(t=50, b=40)
                 )
-                st.plotly_chart(fig_year, use_container_width=True)
+                plotly_config = {"staticPlot": True, "displayModeBar": False}
+                st.plotly_chart(fig_year, use_container_width=True, config=plotly_config)
                 
             with fig_col2:
                 author_expanded = df.assign(
@@ -1012,7 +1004,8 @@ else:
                 )
                 fig_author.update_traces(textposition='inside', textinfo='percent+label')
                 fig_author.update_layout(margin=dict(t=50, b=40))
-                st.plotly_chart(fig_author, use_container_width=True)
+                plotly_config = {"staticPlot": True, "displayModeBar": False}
+                st.plotly_chart(fig_author, use_container_width=True, config=plotly_config)
                 
             st.markdown('---')
             
@@ -1052,7 +1045,8 @@ else:
                         template='plotly_white'
                     )
                     fig_topic_bar.update_layout(xaxis_tickangle=-45, margin=dict(t=50, b=80))
-                    st.plotly_chart(fig_topic_bar, use_container_width=True)
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_topic_bar, use_container_width=True, config=plotly_config)
                 
                 with topic_col2:
                     fig_topic_pie = px.pie(
@@ -1065,7 +1059,8 @@ else:
                     )
                     fig_topic_pie.update_traces(textposition='inside', textinfo='percent+label')
                     fig_topic_pie.update_layout(margin=dict(t=50, b=40))
-                    st.plotly_chart(fig_topic_pie, use_container_width=True)
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_topic_pie, use_container_width=True, config=plotly_config)
             else:
                 st.info('No keyword/topic data available for charts.')
 
@@ -1103,7 +1098,8 @@ else:
                         legend=dict(orientation='h', yanchor='bottom', y=-0.3, xanchor='left', x=0),
                         margin=dict(t=50, b=80)
                     )
-                    st.plotly_chart(fig_kw_stacked, use_container_width=True)
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_kw_stacked, use_container_width=True, config=plotly_config)
 
                 with fig_kw_col2:
                     kw_file_mentions = df_kws_expanded.groupby('Source File').size().reset_index(name='Mentions')
@@ -1117,7 +1113,8 @@ else:
                     )
                     fig_kw_donut.update_traces(textposition='inside', textinfo='percent+label')
                     fig_kw_donut.update_layout(margin=dict(t=50, b=40))
-                    st.plotly_chart(fig_kw_donut, use_container_width=True)
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_kw_donut, use_container_width=True, config=plotly_config)
 
                 st.markdown('---')
                 st.markdown('### Keywords Analysis Table')
