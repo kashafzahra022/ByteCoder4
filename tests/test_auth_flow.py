@@ -14,12 +14,12 @@ def test_username_and_email_are_normalized_for_signup_and_login():
     conn.commit()
     conn.close()
 
-    created = app.register_user(' TestUser ', ' Test@Example.com ', 'secret123')
+    created = app.register_user(None, ' Test@Example.com ', 'secret123')
     assert created is True
 
-    user = app.login_user('testuser', 'secret123')
+    user = app.login_user('test@example.com', 'secret123')
     assert user is not None
-    assert user[1] == 'TestUser'
+    assert user[2] == 'test@example.com'
 
     existing = app.check_email_exists('test@example.com')
     assert existing is not None

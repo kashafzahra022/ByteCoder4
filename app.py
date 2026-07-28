@@ -84,18 +84,18 @@ def normalize_email(email):
 
 # Authentication functions
 def register_user(username, email, password, full_name="", organization="", role=""):
-    normalized_username = normalize_username(username)
     normalized_email = normalize_email(email)
+    normalized_username = normalize_username(username) or normalized_email
 
-    if not normalized_username or not normalized_email or not password:
+    if not normalized_email or not password:
         return False
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
         SELECT id FROM users
-        WHERE lower(trim(username)) = ? OR lower(trim(email)) = ?
-    ''', (normalize_lookup_value(normalized_username), normalize_lookup_value(normalized_email)))
+        WHERE lower(trim(email)) = ?
+    ''', (normalize_lookup_value(normalized_email),))
     if cursor.fetchone():
         conn.close()
         return False
@@ -416,15 +416,15 @@ if 'sent_otp' not in st.session_state:
     st.session_state.sent_otp = None
 
 # Custom sign-in function
-def login_user(username_or_email, password):
-    normalized_value = normalize_lookup_value(username_or_email)
+def login_user(email, password):
+    normalized_email = normalize_lookup_value(email)
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     hashed = hash_password(password)
     cursor.execute('''
         SELECT id, username, email FROM users 
-        WHERE ((lower(trim(username)) = ?) OR (lower(trim(email)) = ?)) AND password = ?
-    ''', (normalized_value, normalized_value, hashed))
+        WHERE lower(trim(email)) = ? AND password = ?
+    ''', (normalized_email, hashed))
     user = cursor.fetchone()
     conn.close()
     return user
@@ -688,7 +688,6 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-subtitle">Set up your private research vault in a minute.</div>', unsafe_allow_html=True)
 
         signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
-        signup_username = st.text_input("Username", key="signup_user", placeholder="Pick a unique username")
         signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
         signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
         signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
@@ -696,20 +695,20 @@ if not st.session_state.logged_in:
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
         if st.button("Create Account", use_container_width=True, key="signup_btn"):
-            if not signup_full_name or not signup_username or not signup_email or not signup_password:
+            if not signup_full_name or not signup_email or not signup_password:
                 st.error("Please fill all required fields")
             elif signup_password != confirm_password:
                 st.error("Passwords do not match")
             elif len(signup_password) < 6:
                 st.error("Password must be at least 6 characters")
             else:
-                if register_user(signup_username, signup_email, signup_password, signup_full_name, signup_organization, signup_role):
+                if register_user(None, signup_email, signup_password, signup_full_name, signup_organization, signup_role):
                     st.success("Account created successfully. You can sign in now.")
                     st.balloons()
                     st.session_state.auth_step = 'welcome'
                     st.rerun()
                 else:
-                    st.error("This username or email is already in use. Please try a different one.")
+                    st.error("This email is already in use. Please try a different one.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.auth_step == 'signin':
@@ -723,21 +722,21 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-title">Welcome Back</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Sign in to access your research vault.</div>', unsafe_allow_html=True)
 
-        login_username = st.text_input("Username or Email", key="login_user", placeholder="Enter your username or email")
+        login_email = st.text_input("Email", key="login_user", placeholder="Enter your email")
         login_password = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
 
         if st.button("Sign In", use_container_width=True, key="login_btn"):
-            user = login_user(login_username, login_password)
+            user = login_user(login_email, login_password)
             if user:
                 st.session_state.logged_in = True
-                st.session_state.username = user[1]
+                st.session_state.username = user[2]
                 st.session_state.user_id = user[0]
                 st.session_state.auth_step = 'welcome'
-                st.success(f"Welcome back, {user[1]}!")
+                st.success(f"Welcome back, {user[2]}!")
                 st.balloons()
                 st.rerun()
             else:
-                st.error("Invalid username/email or password")
+                st.error("Invalid email or password")
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.auth_step == 'google':
@@ -786,7 +785,7 @@ if not st.session_state.logged_in:
                 user_info = check_email_exists(pending_email)
                 clear_otp(pending_email)
                 st.session_state.logged_in = True
-                st.session_state.username = user_info['username']
+                st.session_state.username = user_info['email']
                 st.session_state.user_id = user_info['id']
                 st.session_state.auth_step = 'welcome'
                 st.success("Secure verification completed successfully.")
