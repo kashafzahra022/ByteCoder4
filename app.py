@@ -551,10 +551,11 @@ AUTH_THEME_CSS = """
     border: none !important;
     padding: 12px 18px !important;
     box-shadow: 0 10px 28px rgba(37,99,235,0.34) !important;
-        transition: box-shadow 0.15s ease !important;
-    }
-    .stButton > button:hover {
-
+    transition: box-shadow 0.15s ease !important;
+}
+.stButton > button:hover {
+    box-shadow: 0 14px 34px rgba(124,58,237,0.42) !important;
+}
 .back-link button {
     background: transparent !important;
     color: #93c5fd !important;
