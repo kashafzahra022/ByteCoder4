@@ -859,17 +859,13 @@ if not st.session_state.logged_in:
             if pending_email and verify_otp(pending_email, otp_val):
                 if pending_action == 'signup':
                     if complete_pending_registration(pending_email, otp_val):
-                        user_info = check_email_exists(pending_email)
-                        if user_info:
-                            st.session_state.logged_in = True
-                            st.session_state.username = user_info['email']
-                            st.session_state.user_id = user_info['id']
-                            st.session_state.auth_step = 'welcome'
-                            st.success("Account created successfully. Welcome!")
-                            st.balloons()
-                            st.rerun()
-                        else:
-                            st.error("Unable to finalize your account. Please try again.")
+                        st.session_state.pending_email = None
+                        st.session_state.pending_action = None
+                        st.session_state.temp_user_data = None
+                        st.session_state.auth_step = 'signin'
+                        st.success("Account created successfully. Please sign in or continue with Google.")
+                        st.balloons()
+                        st.rerun()
                     else:
                         st.error("The verification code entered is invalid or your registration could not be completed.")
                 else:
