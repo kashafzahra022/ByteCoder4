@@ -38,6 +38,18 @@ def init_db():
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS pending_registrations (
+            email TEXT PRIMARY KEY,
+            username TEXT,
+            password TEXT,
+            full_name TEXT,
+            organization TEXT,
+            role TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     cursor.execute("PRAGMA table_info(users)")
     columns = [row[1] for row in cursor.fetchall()]
     for column_name, column_type in [("full_name", "TEXT"), ("organization", "TEXT"), ("role", "TEXT")]:
@@ -124,6 +136,59 @@ def check_email_exists(email):
         return {"id": user[0], "username": user[1], "email": user[2]}
     return None
 
+
+def save_pending_registration(email, password, full_name="", organization="", role=""):
+    normalized_email = normalize_email(email)
+    if not normalized_email or not password:
+        return False
+
+    if check_email_exists(normalized_email):
+        return False
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT email FROM pending_registrations WHERE lower(trim(email)) = ?', (normalize_lookup_value(normalized_email),))
+    if cursor.fetchone():
+        conn.close()
+        return False
+
+    try:
+        cursor.execute('''
+            INSERT INTO pending_registrations (email, username, password, full_name, organization, role)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (normalized_email, normalized_email, password, full_name.strip(), organization.strip(), role.strip()))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False
+
+
+def complete_pending_registration(email, otp_code):
+    normalized_email = normalize_email(email)
+    if not normalized_email or not verify_otp(normalized_email, otp_code):
+        return False
+
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT email, username, password, full_name, organization, role FROM pending_registrations WHERE lower(trim(email)) = ?', (normalize_lookup_value(normalized_email),))
+    registration = cursor.fetchone()
+    if not registration:
+        conn.close()
+        return False
+
+    stored_email, username, password_value, full_name, organization, role = registration
+    if register_user(username, stored_email, password_value, full_name, organization, role):
+        cursor.execute('DELETE FROM pending_registrations WHERE lower(trim(email)) = ?', (normalize_lookup_value(normalized_email),))
+        conn.commit()
+        conn.close()
+        clear_otp(normalized_email)
+        return True
+
+    conn.close()
+    return False
+
 # --- OTP STORAGE IN DATABASE (survives server restarts, unlike session_state) ---
 def init_otp_table():
     conn = sqlite3.connect(DB_NAME)
@@ -184,8 +249,8 @@ def send_otp_email(receiver_email, otp_code):
     message["Date"] = formatdate(localtime=True)
     message["Message-ID"] = make_msgid()
 
-    plain_body = f"Hello,\n\nYour verification code is: {otp_code}\n\nIf you did not request this, ignore this email.\n\nRegards,\nResearch Hub Security Team"
-    html_body = f"""<html><body><p>Hello,</p><p><strong>Your verification code is: <span style=\"font-size:18px\">{otp_code}</span></strong></p><p>If you did not request this, please ignore this email.</p><p>Regards,<br/>Research Hub Security Team</p></body></html>"""
+    plain_body = f"Hello,\n\nYour verification code is: {otp_code}\n\nIf you did not request this, ignore this email.\n\nRegards,\nAddiComp Research Hub"
+    html_body = f"""<html><body><p>Hello,</p><p><strong>Your verification code is: <span style=\"font-size:18px\">{otp_code}</span></strong></p><p>If you did not request this, please ignore this email.</p><p>Regards,<br/>AddiComp Research Hub</p></body></html>"""
 
     message.attach(MIMEText(plain_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
@@ -412,6 +477,8 @@ if 'auth_step' not in st.session_state:
     st.session_state.auth_step = 'welcome'
 if 'temp_user_data' not in st.session_state:
     st.session_state.temp_user_data = None
+if 'pending_action' not in st.session_state:
+    st.session_state.pending_action = None
 if 'sent_otp' not in st.session_state:
     st.session_state.sent_otp = None
 
@@ -694,13 +761,23 @@ if not st.session_state.logged_in:
             elif len(signup_password) < 6:
                 st.error("Password must be at least 6 characters")
             else:
-                if register_user(None, signup_email, signup_password, signup_full_name, signup_organization, signup_role):
-                    st.success("Account created successfully. You can sign in now.")
-                    st.balloons()
-                    st.session_state.auth_step = 'welcome'
-                    st.rerun()
+                if save_pending_registration(signup_email, signup_password, signup_full_name, signup_organization, signup_role):
+                    generated_otp = str(random.randint(100000, 999999))
+                    save_otp(signup_email, generated_otp)
+                    st.session_state.pending_email = normalize_email(signup_email)
+                    st.session_state.pending_action = 'signup'
+                    st.session_state.temp_user_data = {
+                        'email': normalize_email(signup_email),
+                        'full_name': signup_full_name,
+                        'organization': signup_organization,
+                        'role': signup_role,
+                    }
+                    with st.spinner("Delivering verification code..."):
+                        if send_otp_email(normalize_email(signup_email), generated_otp):
+                            st.session_state.auth_step = 'otp_verify'
+                            st.rerun()
                 else:
-                    st.error("This email is already in use. Please try a different one.")
+                    st.error("This email is already in use or already pending verification. Please try a different one.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.auth_step == 'signin':
@@ -751,11 +828,11 @@ if not st.session_state.logged_in:
                 if user_info:
                     generated_otp = str(random.randint(100000, 999999))
                     save_otp(google_email, generated_otp)
-                    st.session_state.sent_otp = generated_otp
                     st.session_state.temp_user_data = user_info
-                    st.session_state.pending_email = google_email
+                    st.session_state.pending_email = normalize_email(google_email)
+                    st.session_state.pending_action = 'google_login'
                     with st.spinner("Delivering secure access code..."):
-                        if send_otp_email(google_email, generated_otp):
+                        if send_otp_email(normalize_email(google_email), generated_otp):
                             st.session_state.auth_step = 'otp_verify'
                             st.rerun()
                 else:
@@ -773,16 +850,33 @@ if not st.session_state.logged_in:
 
         if st.button("Confirm & Login", use_container_width=True):
             pending_email = st.session_state.get('pending_email')
+            pending_action = st.session_state.get('pending_action', 'google_login')
             if pending_email and verify_otp(pending_email, otp_val):
-                user_info = check_email_exists(pending_email)
-                clear_otp(pending_email)
-                st.session_state.logged_in = True
-                st.session_state.username = user_info['email']
-                st.session_state.user_id = user_info['id']
-                st.session_state.auth_step = 'welcome'
-                st.success("Secure verification completed successfully.")
-                st.balloons()
-                st.rerun()
+                if pending_action == 'signup':
+                    if complete_pending_registration(pending_email, otp_val):
+                        user_info = check_email_exists(pending_email)
+                        if user_info:
+                            st.session_state.logged_in = True
+                            st.session_state.username = user_info['email']
+                            st.session_state.user_id = user_info['id']
+                            st.session_state.auth_step = 'welcome'
+                            st.success("Account created successfully. Welcome!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("Unable to finalize your account. Please try again.")
+                    else:
+                        st.error("The verification code entered is invalid or your registration could not be completed.")
+                else:
+                    user_info = check_email_exists(pending_email)
+                    clear_otp(pending_email)
+                    st.session_state.logged_in = True
+                    st.session_state.username = user_info['email']
+                    st.session_state.user_id = user_info['id']
+                    st.session_state.auth_step = 'welcome'
+                    st.success("Secure verification completed successfully.")
+                    st.balloons()
+                    st.rerun()
             else:
                 st.error("The verification code entered is invalid.")
         st.markdown('</div>', unsafe_allow_html=True)
