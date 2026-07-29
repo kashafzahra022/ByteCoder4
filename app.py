@@ -744,7 +744,7 @@ if not st.session_state.logged_in:
 
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-title">Create Your Account</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card-subtitle">Set up your private research vault in a minute.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle">Enter your details and we will send a verification code before creating your account.</div>', unsafe_allow_html=True)
 
         signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
         signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
@@ -753,7 +753,7 @@ if not st.session_state.logged_in:
         signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
-        if st.button("Create Account", use_container_width=True, key="signup_btn"):
+        if st.button("Send Verification Code", use_container_width=True, key="signup_btn"):
             if not signup_full_name or not signup_email or not signup_password:
                 st.error("Please fill all required fields")
             elif signup_password != confirm_password:
@@ -843,12 +843,17 @@ if not st.session_state.logged_in:
 
     elif st.session_state.auth_step == 'otp_verify':
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Verify OTP Code</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card-subtitle">A verification code has been dispatched to your email.</div>', unsafe_allow_html=True)
+        pending_action = st.session_state.get('pending_action', 'google_login')
+        if pending_action == 'signup':
+            st.markdown('<div class="card-title">Enter Signup Verification Code</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-subtitle">We have sent a code to your email. Your account will be created after verification.</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="card-title">Verify OTP Code</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-subtitle">A verification code has been dispatched to your email.</div>', unsafe_allow_html=True)
 
         otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
 
-        if st.button("Confirm & Login", use_container_width=True):
+        if st.button("Confirm & Complete Signup", use_container_width=True) if st.session_state.get('pending_action') == 'signup' else st.button("Confirm & Login", use_container_width=True):
             pending_email = st.session_state.get('pending_email')
             pending_action = st.session_state.get('pending_action', 'google_login')
             if pending_email and verify_otp(pending_email, otp_val):
