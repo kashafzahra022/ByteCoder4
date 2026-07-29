@@ -242,7 +242,7 @@ def send_otp_email(receiver_email, otp_code):
 
     # build multipart/alternative message with plain and html
     message = MIMEMultipart("alternative")
-    message["From"] = CENTRAL_SENDER
+    message["From"] = f"AddiComp Research Hub <{CENTRAL_SENDER}>"
     message["To"] = receiver_email
     message["Subject"] = f"Your Research Vault Verification Code: {otp_code}"
     message["Reply-To"] = CENTRAL_SENDER
