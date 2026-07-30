@@ -742,16 +742,18 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-title">Create Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your details to continue.</div>', unsafe_allow_html=True)
 
-        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
-        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
-        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
-        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
+       # Input fields (strip() use karke whitespace handle karein)
+        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name").strip()
+        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com").strip()
+        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company").strip()
+        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer").strip()
         signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
         if st.button("Continue", use_container_width=True, key="signup_btn"):
-            if not signup_full_name or not signup_email or not signup_password:
-                st.error("Please fill all required fields")
+            # Explicit check so empty strings don't pass
+            if not signup_full_name or not signup_email or not signup_password or not confirm_password:
+                st.error("Please fill all required fields (Full Name, Email, Password, and Confirm Password).")
             elif signup_password != confirm_password:
                 st.error("Passwords do not match")
             elif len(signup_password) < 6:
@@ -774,7 +776,6 @@ if not st.session_state.logged_in:
                             st.rerun()
                 else:
                     st.error("This email is already in use or already pending verification. Please try a different one.")
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # 3. SIGN IN PAGE
     elif st.session_state.auth_step == 'signin':
