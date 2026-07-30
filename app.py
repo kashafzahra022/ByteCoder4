@@ -596,15 +596,17 @@ AUTH_THEME_CSS = """
     color: #94a3b8;
     margin-bottom: 22px;
 }
-
 .stTextInput > div > div > input {
     border-radius: 12px !important;
     padding: 11px 14px !important;
-    background: rgba(255,255,255,0.98) !important;
+    background: #ffffff !important;
     color: #0f172a !important;
     border: 1px solid rgba(255,255,255,0.2) !important;
 }
-
+.stTextInput > div > div > input:disabled {
+    background: #e2e8f0 !important;
+    color: #475569 !important;
+}
 .stButton > button {
     border-radius: 14px !important;
     font-weight: 800 !important;
@@ -743,40 +745,45 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-subtitle">Enter your details to continue.</div>', unsafe_allow_html=True)
 
        # Input fields (strip() use karke whitespace handle karein)
-        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name").strip()
-        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com").strip()
-        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company").strip()
-        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer").strip()
+        # Streamlit Text Inputs (strip validation baad mein karein, direct assignment ke saath nahi)
+        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
+        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
+        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
+        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
         signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
         if st.button("Continue", use_container_width=True, key="signup_btn"):
-            # Explicit check so empty strings don't pass
-            if not signup_full_name or not signup_email or not signup_password or not confirm_password:
+            # Values ko clean karein button click par
+            name_val = signup_full_name.strip()
+            email_val = signup_email.strip()
+            pass_val = signup_password.strip()
+            confirm_val = confirm_password.strip()
+
+            if not name_val or not email_val or not pass_val or not confirm_val:
                 st.error("Please fill all required fields (Full Name, Email, Password, and Confirm Password).")
-            elif signup_password != confirm_password:
+            elif pass_val != confirm_val:
                 st.error("Passwords do not match")
-            elif len(signup_password) < 6:
+            elif len(pass_val) < 6:
                 st.error("Password must be at least 6 characters")
             else:
-                if save_pending_registration(signup_email, signup_password, signup_full_name, signup_organization, signup_role):
+                if save_pending_registration(email_val, pass_val, name_val, signup_organization.strip(), signup_role.strip()):
                     generated_otp = str(random.randint(100000, 999999))
-                    save_otp(normalize_email(signup_email), generated_otp)
-                    st.session_state.pending_email = normalize_email(signup_email)
+                    save_otp(normalize_email(email_val), generated_otp)
+                    st.session_state.pending_email = normalize_email(email_val)
                     st.session_state.pending_action = 'signup'
                     st.session_state.temp_user_data = {
-                        'email': normalize_email(signup_email),
-                        'full_name': signup_full_name,
-                        'organization': signup_organization,
-                        'role': signup_role,
+                        'email': normalize_email(email_val),
+                        'full_name': name_val,
+                        'organization': signup_organization.strip(),
+                        'role': signup_role.strip(),
                     }
                     with st.spinner("Delivering verification code..."):
-                        if send_otp_email(normalize_email(signup_email), generated_otp):
+                        if send_otp_email(normalize_email(email_val), generated_otp):
                             st.session_state.auth_step = 'otp_verify'
                             st.rerun()
                 else:
                     st.error("This email is already in use or already pending verification. Please try a different one.")
-
     # 3. SIGN IN PAGE
     elif st.session_state.auth_step == 'signin':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
