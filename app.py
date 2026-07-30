@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 DB_NAME = 'research_vault.db'
 
 def get_initial_auth_step():
-    return 'welcome'
+    return 'welcome'  # <-- Change from 'signup' to 'welcome'
 
 
 def init_db():
@@ -695,42 +695,42 @@ UPLOAD_SUMMARY_CSS = """
 if not st.session_state.logged_in:
     st.markdown(AUTH_THEME_CSS, unsafe_allow_html=True)
 
-    # 1. MAIN WELCOME LANDING PAGE (DEFAULT)
+    # 1. Main Welcome Landing Page (Image se exact match)
     if st.session_state.auth_step == 'welcome':
         st.markdown('''
             <div class="hero-wrap">
                 <div class="hero-badge">PREMIUM RESEARCH EXPERIENCE</div>
-                <div class="hero-title">Welcome to Your<br>3D Research Hub</div>
-                <div class="hero-subtitle">
-                    A modern and polished workspace for uploading research papers, extracting smart metadata, and managing your private composite-materials library with clarity and confidence.
+                <div class="hero-title">Welcome to Your<br/>3D Research Hub</div>
+                <div class="hero-subtitle-wrap">
+                    <p class="hero-subtitle">
+                        A modern and polished workspace for uploading research papers, extracting smart metadata, and managing your private composite-materials library with clarity and confidence.
+                    </p>
                 </div>
                 <div class="hero-pill-row">
                     <span class="hero-pill">Smart PDF Extraction</span>
-                    <span class="hero-pill">Private & Secure Vault</span>
+                    <span class="hero-pill">Private Secure Vault</span>
                     <span class="hero-pill">Beautiful Analytics</span>
                 </div>
             </div>
         ''', unsafe_allow_html=True)
 
-        col_left, col_mid, col_right = st.columns([1, 1, 1])
-        with col_left:
-            if st.button("Sign Up", use_container_width=True, key="welcome_signup_btn"):
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if st.button("Sign Up", use_container_width=True, key="btn_signup"):
                 st.session_state.auth_step = 'signup'
                 st.rerun()
-
-        with col_mid:
-            if st.button("Sign In", use_container_width=True, key="welcome_signin_btn"):
+        with col2:
+            if st.button("Sign In", use_container_width=True, key="btn_signin"):
                 st.session_state.auth_step = 'signin'
                 st.rerun()
-
-        with col_right:
-            if st.button("Continue with Google", use_container_width=True, key="welcome_google_btn"):
+        with col3:
+            if st.button("Continue with Google", use_container_width=True, key="btn_google"):
                 st.session_state.auth_step = 'google'
                 st.rerun()
 
         st.markdown('<div class="privacy-note">Your data stays private — passwords are hashed and never stored in plain text.</div>', unsafe_allow_html=True)
 
-    # 2. SIGN UP PAGE
+    # 2. Signup Page
     elif st.session_state.auth_step == 'signup':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
         if st.button("⬅ Back", key="back_from_signup"):
