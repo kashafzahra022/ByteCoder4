@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 DB_NAME = 'research_vault.db'
 
 def get_initial_auth_step():
-    return 'signup'
+    return 'welcome'
 
 
 def init_db():
@@ -192,7 +192,7 @@ def complete_pending_registration(email, otp_code):
     conn.close()
     return False
 
-# --- OTP STORAGE IN DATABASE (survives server restarts) ---
+# --- OTP STORAGE IN DATABASE ---
 def init_otp_table():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -234,7 +234,7 @@ def clear_otp(email):
     conn.commit()
     conn.close()
 
-# SMTP Email Sender for OTP Verification
+# SMTP Email Sender
 def send_otp_email(receiver_email, otp_code):
     load_dotenv(override=True)
     CENTRAL_SENDER = os.environ.get("SMTP_EMAIL")
@@ -475,8 +475,9 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
-if 'auth_step' not in st.session_state:
-    st.session_state.auth_step = get_initial_auth_step()
+# Force default screen to welcome page
+if 'auth_step' not in st.session_state or st.session_state.auth_step not in ['welcome', 'signup', 'signin', 'google', 'otp_verify']:
+    st.session_state.auth_step = 'welcome'
 if 'temp_user_data' not in st.session_state:
     st.session_state.temp_user_data = None
 if 'pending_action' not in st.session_state:
@@ -512,6 +513,66 @@ AUTH_THEME_CSS = """
 
 #MainMenu, header, footer {visibility: hidden;}
 
+.hero-wrap {
+    text-align: center;
+    padding: 70px 24px 20px 24px;
+}
+
+.hero-badge {
+    display: inline-block;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(56,189,248,0.12);
+    border: 1px solid rgba(56,189,248,0.35);
+    color: #7dd3fc;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+}
+
+.hero-title {
+    font-size: 58px;
+    font-weight: 900;
+    line-height: 1.12;
+    margin: 0 auto 18px auto;
+    max-width: 780px;
+    background: linear-gradient(120deg, #ffffff 15%, #bfdbfe 40%, #c4b5fd 80%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 10px 40px rgba(56,189,248,0.16);
+}
+
+.hero-subtitle {
+    font-size: 17px;
+    color: #cbd5e1;
+    font-weight: 500;
+    max-width: 680px;
+    margin: 0 auto 24px auto;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.hero-pill-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.hero-pill {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #e2e8f0;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .card-panel {
     background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
     backdrop-filter: blur(22px);
@@ -544,18 +605,17 @@ AUTH_THEME_CSS = """
     border: 1px solid rgba(255,255,255,0.2) !important;
 }
 
-.stButton > button, .stFormSubmitButton > button {
+.stButton > button {
     border-radius: 14px !important;
     font-weight: 800 !important;
-    background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
     color: white !important;
     border: none !important;
     padding: 12px 18px !important;
-    box-shadow: 0 10px 28px rgba(37,99,235,0.34) !important;
+    box-shadow: 0 10px 28px rgba(79,70,229,0.34) !important;
     transition: box-shadow 0.15s ease !important;
-    width: 100% !important;
 }
-.stButton > button:hover, .stFormSubmitButton > button:hover {
+.stButton > button:hover {
     box-shadow: 0 14px 34px rgba(124,58,237,0.42) !important;
 }
 .back-link button {
@@ -564,6 +624,13 @@ AUTH_THEME_CSS = """
     box-shadow: none !important;
     font-weight: 700 !important;
     padding: 4px 0 !important;
+}
+
+.privacy-note {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 13px;
+    margin-top: 24px;
 }
 </style>
 """
@@ -628,28 +695,62 @@ UPLOAD_SUMMARY_CSS = """
 if not st.session_state.logged_in:
     st.markdown(AUTH_THEME_CSS, unsafe_allow_html=True)
 
+    # 1. MAIN WELCOME LANDING PAGE (DEFAULT)
     if st.session_state.auth_step == 'welcome':
-        st.session_state.auth_step = 'signup'
-        st.rerun()
+        st.markdown('''
+            <div class="hero-wrap">
+                <div class="hero-badge">PREMIUM RESEARCH EXPERIENCE</div>
+                <div class="hero-title">Welcome to Your<br>3D Research Hub</div>
+                <div class="hero-subtitle">
+                    A modern and polished workspace for uploading research papers, extracting smart metadata, and managing your private composite-materials library with clarity and confidence.
+                </div>
+                <div class="hero-pill-row">
+                    <span class="hero-pill">Smart PDF Extraction</span>
+                    <span class="hero-pill">Private & Secure Vault</span>
+                    <span class="hero-pill">Beautiful Analytics</span>
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
 
+        col_left, col_mid, col_right = st.columns([1, 1, 1])
+        with col_left:
+            if st.button("Sign Up", use_container_width=True, key="welcome_signup_btn"):
+                st.session_state.auth_step = 'signup'
+                st.rerun()
+
+        with col_mid:
+            if st.button("Sign In", use_container_width=True, key="welcome_signin_btn"):
+                st.session_state.auth_step = 'signin'
+                st.rerun()
+
+        with col_right:
+            if st.button("Continue with Google", use_container_width=True, key="welcome_google_btn"):
+                st.session_state.auth_step = 'google'
+                st.rerun()
+
+        st.markdown('<div class="privacy-note">Your data stays private — passwords are hashed and never stored in plain text.</div>', unsafe_allow_html=True)
+
+    # 2. SIGN UP PAGE
     elif st.session_state.auth_step == 'signup':
+        st.markdown('<div class="back-link">', unsafe_allow_html=True)
+        if st.button("⬅ Back", key="back_from_signup"):
+            st.session_state.auth_step = 'welcome'
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-title">Create Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your details to continue.</div>', unsafe_allow_html=True)
 
-        # FIXED FORM WITH st.form
-        with st.form("signup_form", clear_on_submit=False):
-            signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
-            signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
-            signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
-            signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
-            signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
-            confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
+        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
+        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
+        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
+        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
+        signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
+        confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
-            submit_signup = st.form_submit_button("Create Account", use_container_width=True)
-
-        if submit_signup:
-            if not signup_full_name.strip() or not signup_email.strip() or not signup_password:
+        if st.button("Continue", use_container_width=True, key="signup_btn"):
+            if not signup_full_name or not signup_email or not signup_password:
                 st.error("Please fill all required fields")
             elif signup_password != confirm_password:
                 st.error("Passwords do not match")
@@ -675,17 +776,22 @@ if not st.session_state.logged_in:
                     st.error("This email is already in use or already pending verification. Please try a different one.")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 3. SIGN IN PAGE
     elif st.session_state.auth_step == 'signin':
+        st.markdown('<div class="back-link">', unsafe_allow_html=True)
+        if st.button("⬅ Back", key="back_from_signin"):
+            st.session_state.auth_step = 'welcome'
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-title">Access Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your credentials to continue.</div>', unsafe_allow_html=True)
 
-        with st.form("signin_form", clear_on_submit=False):
-            login_email = st.text_input("Email", key="login_user", placeholder="Enter your email")
-            login_password = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
-            submit_login = st.form_submit_button("Continue", use_container_width=True)
+        login_email = st.text_input("Email", key="login_user", placeholder="Enter your email")
+        login_password = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
 
-        if submit_login:
+        if st.button("Continue", use_container_width=True, key="login_btn"):
             user = login_user(login_email, login_password)
             if user:
                 st.session_state.logged_in = True
@@ -699,10 +805,44 @@ if not st.session_state.logged_in:
                 st.error("Invalid email or password")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 4. GOOGLE AUTH PAGE
+    elif st.session_state.auth_step == 'google':
+        st.markdown('<div class="back-link">', unsafe_allow_html=True)
+        if st.button("⬅ Back", key="back_from_google"):
+            st.session_state.auth_step = 'welcome'
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="card-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">Verify Email</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle">Enter your email address to receive a code.</div>', unsafe_allow_html=True)
+
+        google_email = st.text_input("Google Email", key="google_email", placeholder="name@gmail.com")
+        google_name = st.text_input("Display Name", key="google_name", placeholder="Your name")
+        
+        if st.button("Send Code", use_container_width=True, key="google_btn"):
+            if google_email:
+                user_info = check_email_exists(google_email)
+                if user_info:
+                    generated_otp = str(random.randint(100000, 999999))
+                    save_otp(normalize_email(google_email), generated_otp)
+                    st.session_state.temp_user_data = user_info
+                    st.session_state.pending_email = normalize_email(google_email)
+                    st.session_state.pending_action = 'google_login'
+                    with st.spinner("Delivering secure access code..."):
+                        if send_otp_email(normalize_email(google_email), generated_otp):
+                            st.session_state.auth_step = 'otp_verify'
+                            st.rerun()
+                else:
+                    st.error("Account matching this email was not found.")
+            else:
+                st.error("Please enter your Google email")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 5. OTP VERIFY PAGE
     elif st.session_state.auth_step == 'otp_verify':
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
         pending_action = st.session_state.get('pending_action', 'google_login')
-        
         if pending_action == 'signup':
             st.markdown('<div class="card-title">Enter Signup Verification Code</div>', unsafe_allow_html=True)
             st.markdown('<div class="card-subtitle">We have sent a code to your email. Your account will be created after verification.</div>', unsafe_allow_html=True)
@@ -710,11 +850,9 @@ if not st.session_state.logged_in:
             st.markdown('<div class="card-title">Verify OTP Code</div>', unsafe_allow_html=True)
             st.markdown('<div class="card-subtitle">A verification code has been dispatched to your email.</div>', unsafe_allow_html=True)
 
-        with st.form("otp_form", clear_on_submit=False):
-            otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
-            submit_otp = st.form_submit_button("Verify Code", use_container_width=True)
+        otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
 
-        if submit_otp:
+        if st.button("Verify Code", use_container_width=True):
             pending_email = st.session_state.get('pending_email')
             pending_action = st.session_state.get('pending_action', 'google_login')
             if pending_email and verify_otp(pending_email, otp_val):
@@ -939,8 +1077,7 @@ else:
                 ).explode('Author')
                 author_expanded['Author'] = author_expanded['Author'].astype(str).str.strip()
                 author_expanded = author_expanded[author_expanded['Author'] != '']
-                author_group = author_expanded.groupby('Author').size().reset_index(name='Papers')
-                author_group = author_group.sort_values('Papers', ascending=False).head(10)
+                author_group = author_expanded.groupby('Author').size().reset_index(name='Papers').sort_values('Papers', ascending=False).head(10)
                 fig_author = px.pie(
                     author_group,
                     values='Papers',
@@ -973,8 +1110,7 @@ else:
             
             if topic_data:
                 df_topic = pd.DataFrame(topic_data)
-                topic_group = df_topic.groupby('Topic').size().reset_index(name='Mentions')
-                topic_group = topic_group.sort_values('Mentions', ascending=False).head(10)
+                topic_group = df_topic.groupby('Topic').size().reset_index(name='Mentions').sort_values('Mentions', ascending=False).head(10)
                 topic_col1, topic_col2 = st.columns(2)
                 
                 with topic_col1:
