@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 DB_NAME = 'research_vault.db'
 
 def get_initial_auth_step():
-    return 'welcome'  # <-- Change from 'signup' to 'welcome'
+    return 'welcome'
 
 
 def init_db():
@@ -54,9 +54,17 @@ def init_db():
     ''')
 
     cursor.execute("PRAGMA table_info(users)")
-    columns = [row[1] for row in cursor.fetchall()]
-    for column_name, column_type in [("full_name", "TEXT"), ("organization", "TEXT"), ("role", "TEXT")]:
-        if column_name not in columns:
+    existing_columns = [row[1] for row in cursor.fetchall()]
+    
+    # Secure schema extension mapping
+    allowed_columns = {
+        "full_name": "TEXT",
+        "organization": "TEXT",
+        "role": "TEXT"
+    }
+
+    for column_name, column_type in allowed_columns.items():
+        if column_name not in existing_columns:
             cursor.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type}')
 
     cursor.execute('''
@@ -440,7 +448,7 @@ def automatic_extractor(text):
         unique_words = list(dict.fromkeys(words))
         keywords = ", ".join(unique_words[:5])
 
-    # 5. Abstract Extraction
+    # 5. Abstract Extraction (Escaped Regex Applied)
     abs_match = re.search(r'\b(abstract|summary)\b\s*[:.-]?', text, re.IGNORECASE)
     if abs_match:
         start_idx = abs_match.end()
@@ -448,7 +456,8 @@ def automatic_extractor(text):
         end_markers = ["keywords", "key words", "index terms", "1. introduction", "introduction"]
         end_idx = -1
         for marker in end_markers:
-            m_match = re.search(r'\b' + marker + r'\b', remaining_text, re.IGNORECASE)
+            pattern = r'\b' + re.escape(marker) + r'\b'
+            m_match = re.search(pattern, remaining_text, re.IGNORECASE)
             if m_match:
                 end_idx = m_match.start()
                 break
@@ -475,7 +484,6 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
-# Force default screen to welcome page
 if 'auth_step' not in st.session_state or st.session_state.auth_step not in ['welcome', 'signup', 'signin', 'google', 'otp_verify']:
     st.session_state.auth_step = 'welcome'
 if 'temp_user_data' not in st.session_state:
@@ -634,6 +642,16 @@ AUTH_THEME_CSS = """
     font-size: 13px;
     margin-top: 24px;
 }
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-text-fill-color: #0f172a !important;
+    -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+    box-shadow: 0 0 0px 1000px #ffffff inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
 </style>
 """
 
@@ -697,7 +715,7 @@ UPLOAD_SUMMARY_CSS = """
 if not st.session_state.logged_in:
     st.markdown(AUTH_THEME_CSS, unsafe_allow_html=True)
 
-    # 1. Main Welcome Landing Page (Image se exact match)
+    # 1. Main Welcome Landing Page
     if st.session_state.auth_step == 'welcome':
         st.markdown('''
             <div class="hero-wrap">
@@ -744,8 +762,6 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-title">Create Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your details to continue.</div>', unsafe_allow_html=True)
 
-       # Input fields (strip() use karke whitespace handle karein)
-        # Streamlit Text Inputs (strip validation baad mein karein, direct assignment ke saath nahi)
         signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
         signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
         signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
@@ -754,7 +770,6 @@ if not st.session_state.logged_in:
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
         if st.button("Continue", use_container_width=True, key="signup_btn"):
-            # Values ko clean karein button click par
             name_val = signup_full_name.strip()
             email_val = signup_email.strip()
             pass_val = signup_password.strip()
@@ -784,6 +799,7 @@ if not st.session_state.logged_in:
                             st.rerun()
                 else:
                     st.error("This email is already in use or already pending verification. Please try a different one.")
+    
     # 3. SIGN IN PAGE
     elif st.session_state.auth_step == 'signin':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
