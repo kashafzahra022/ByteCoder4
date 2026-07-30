@@ -15,14 +15,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid
 from datetime import datetime
+import os
 from dotenv import load_dotenv
 
 # Database Setup
 DB_NAME = 'research_vault.db'
-
-def get_initial_auth_step():
-    return 'welcome'
-
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -54,17 +51,9 @@ def init_db():
     ''')
 
     cursor.execute("PRAGMA table_info(users)")
-    existing_columns = [row[1] for row in cursor.fetchall()]
-    
-    # Secure schema extension mapping
-    allowed_columns = {
-        "full_name": "TEXT",
-        "organization": "TEXT",
-        "role": "TEXT"
-    }
-
-    for column_name, column_type in allowed_columns.items():
-        if column_name not in existing_columns:
+    columns = [row[1] for row in cursor.fetchall()]
+    for column_name, column_type in [("full_name", "TEXT"), ("organization", "TEXT"), ("role", "TEXT")]:
+        if column_name not in columns:
             cursor.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type}')
 
     cursor.execute('''
@@ -200,7 +189,7 @@ def complete_pending_registration(email, otp_code):
     conn.close()
     return False
 
-# --- OTP STORAGE IN DATABASE ---
+# --- OTP STORAGE IN DATABASE (survives server restarts, unlike session_state) ---
 def init_otp_table():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -242,7 +231,7 @@ def clear_otp(email):
     conn.commit()
     conn.close()
 
-# SMTP Email Sender
+# SMTP Email Sender for OTP Verification
 def send_otp_email(receiver_email, otp_code):
     load_dotenv(override=True)
     CENTRAL_SENDER = os.environ.get("SMTP_EMAIL")
@@ -251,6 +240,7 @@ def send_otp_email(receiver_email, otp_code):
         st.error("SMTP credentials are not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env")
         return False
 
+    # build multipart/alternative message with plain and html
     message = MIMEMultipart("alternative")
     message["From"] = f"AddiComp Research Hub <{CENTRAL_SENDER}>"
     message["To"] = receiver_email
@@ -448,7 +438,7 @@ def automatic_extractor(text):
         unique_words = list(dict.fromkeys(words))
         keywords = ", ".join(unique_words[:5])
 
-    # 5. Abstract Extraction (Escaped Regex Applied)
+    # 5. Abstract Extraction
     abs_match = re.search(r'\b(abstract|summary)\b\s*[:.-]?', text, re.IGNORECASE)
     if abs_match:
         start_idx = abs_match.end()
@@ -456,8 +446,7 @@ def automatic_extractor(text):
         end_markers = ["keywords", "key words", "index terms", "1. introduction", "introduction"]
         end_idx = -1
         for marker in end_markers:
-            pattern = r'\b' + re.escape(marker) + r'\b'
-            m_match = re.search(pattern, remaining_text, re.IGNORECASE)
+            m_match = re.search(r'\b' + marker + r'\b', remaining_text, re.IGNORECASE)
             if m_match:
                 end_idx = m_match.start()
                 break
@@ -484,7 +473,7 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
-if 'auth_step' not in st.session_state or st.session_state.auth_step not in ['welcome', 'signup', 'signin', 'google', 'otp_verify']:
+if 'auth_step' not in st.session_state:
     st.session_state.auth_step = 'welcome'
 if 'temp_user_data' not in st.session_state:
     st.session_state.temp_user_data = None
@@ -523,7 +512,7 @@ AUTH_THEME_CSS = """
 
 .hero-wrap {
     text-align: center;
-    padding: 70px 24px 20px 24px;
+    padding: 70px 24px 34px 24px;
 }
 
 .hero-badge {
@@ -554,13 +543,21 @@ AUTH_THEME_CSS = """
 }
 
 .hero-subtitle {
-    font-size: 17px;
-    color: #cbd5e1;
-    font-weight: 500;
+    font-size: 19px;
+    color: #dbeafe;
+    font-weight: 600;
     max-width: 680px;
-    margin: 0 auto 24px auto;
-    line-height: 1.6;
+    margin: 0;
+    line-height: 1.7;
     text-align: center;
+    width: 100%;
+}
+
+.hero-subtitle-wrap {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 18px;
 }
 
 .hero-pill-row {
@@ -568,7 +565,7 @@ AUTH_THEME_CSS = """
     justify-content: center;
     gap: 12px;
     flex-wrap: wrap;
-    margin-bottom: 30px;
+    margin-bottom: 8px;
 }
 
 .hero-pill {
@@ -604,25 +601,23 @@ AUTH_THEME_CSS = """
     color: #94a3b8;
     margin-bottom: 22px;
 }
+
 .stTextInput > div > div > input {
     border-radius: 12px !important;
     padding: 11px 14px !important;
-    background: #ffffff !important;
+    background: rgba(255,255,255,0.98) !important;
     color: #0f172a !important;
     border: 1px solid rgba(255,255,255,0.2) !important;
 }
-.stTextInput > div > div > input:disabled {
-    background: #e2e8f0 !important;
-    color: #475569 !important;
-}
+
 .stButton > button {
     border-radius: 14px !important;
     font-weight: 800 !important;
-    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+    background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
     color: white !important;
     border: none !important;
     padding: 12px 18px !important;
-    box-shadow: 0 10px 28px rgba(79,70,229,0.34) !important;
+    box-shadow: 0 10px 28px rgba(37,99,235,0.34) !important;
     transition: box-shadow 0.15s ease !important;
 }
 .stButton > button:hover {
@@ -641,16 +636,6 @@ AUTH_THEME_CSS = """
     color: #94a3b8;
     font-size: 13px;
     margin-top: 24px;
-}
-
-input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
-input:-webkit-autofill:active {
-    -webkit-text-fill-color: #0f172a !important;
-    -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
-    box-shadow: 0 0 0px 1000px #ffffff inset !important;
-    transition: background-color 5000s ease-in-out 0s;
 }
 </style>
 """
@@ -715,52 +700,51 @@ UPLOAD_SUMMARY_CSS = """
 if not st.session_state.logged_in:
     st.markdown(AUTH_THEME_CSS, unsafe_allow_html=True)
 
-    # 1. Main Welcome Landing Page
     if st.session_state.auth_step == 'welcome':
-        st.markdown('''
-            <div class="hero-wrap">
-                <div class="hero-badge">PREMIUM RESEARCH EXPERIENCE</div>
-                <div class="hero-title">Welcome to Your<br/>3D Research Hub</div>
-                <div class="hero-subtitle-wrap">
-                    <p class="hero-subtitle">
-                        A modern and polished workspace for uploading research papers, extracting smart metadata, and managing your private composite-materials library with clarity and confidence.
-                    </p>
-                </div>
-                <div class="hero-pill-row">
-                    <span class="hero-pill">Smart PDF Extraction</span>
-                    <span class="hero-pill">Private Secure Vault</span>
-                    <span class="hero-pill">Beautiful Analytics</span>
-                </div>
+        st.markdown("""
+        <div class="hero-wrap">
+            <div class="hero-badge">Premium Research Experience</div>
+            <div class="hero-title">Welcome to Your<br>3D Research Hub</div>
+            <div class="hero-subtitle-wrap">
+                <p class="hero-subtitle">
+                    A modern and polished workspace for uploading research papers, extracting smart metadata,
+                    and managing your private composite-materials library with clarity and confidence.
+                </p>
             </div>
-        ''', unsafe_allow_html=True)
+            <div class="hero-pill-row">
+                <div class="hero-pill">Smart PDF Extraction</div>
+                <div class="hero-pill">Private Secure Vault</div>
+                <div class="hero-pill">Beautiful Analytics</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            if st.button("Sign Up", use_container_width=True, key="btn_signup"):
+        b1, b2, b3 = st.columns(3, gap="medium")
+        with b1:
+            if st.button("Sign Up", use_container_width=True, key="go_signup"):
                 st.session_state.auth_step = 'signup'
                 st.rerun()
-        with col2:
-            if st.button("Sign In", use_container_width=True, key="btn_signin"):
+        with b2:
+            if st.button("Sign In", use_container_width=True, key="go_signin"):
                 st.session_state.auth_step = 'signin'
                 st.rerun()
-        with col3:
-            if st.button("Continue with Google", use_container_width=True, key="btn_google"):
+        with b3:
+            if st.button("Continue with Google", use_container_width=True, key="go_google"):
                 st.session_state.auth_step = 'google'
                 st.rerun()
 
-        st.markdown('<div class="privacy-note">Your data stays private — passwords are hashed and never stored in plain text.</div>', unsafe_allow_html=True)
+        st.markdown('<p class="privacy-note">Your data stays private — passwords are hashed and never stored in plain text.</p>', unsafe_allow_html=True)
 
-    # 2. Signup Page
     elif st.session_state.auth_step == 'signup':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
-        if st.button("⬅ Back", key="back_from_signup"):
+        if st.button("⬅ Back to Welcome", key="back_from_signup"):
             st.session_state.auth_step = 'welcome'
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Create Account</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card-subtitle">Enter your details to continue.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">Create Your Account</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle">Enter your details and we will send a verification code before creating your account.</div>', unsafe_allow_html=True)
 
         signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
         signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
@@ -769,53 +753,48 @@ if not st.session_state.logged_in:
         signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
         confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
 
-        if st.button("Continue", use_container_width=True, key="signup_btn"):
-            name_val = signup_full_name.strip()
-            email_val = signup_email.strip()
-            pass_val = signup_password.strip()
-            confirm_val = confirm_password.strip()
-
-            if not name_val or not email_val or not pass_val or not confirm_val:
-                st.error("Please fill all required fields (Full Name, Email, Password, and Confirm Password).")
-            elif pass_val != confirm_val:
+        if st.button("Send Verification Code", use_container_width=True, key="signup_btn"):
+            if not signup_full_name or not signup_email or not signup_password:
+                st.error("Please fill all required fields")
+            elif signup_password != confirm_password:
                 st.error("Passwords do not match")
-            elif len(pass_val) < 6:
+            elif len(signup_password) < 6:
                 st.error("Password must be at least 6 characters")
             else:
-                if save_pending_registration(email_val, pass_val, name_val, signup_organization.strip(), signup_role.strip()):
+                if save_pending_registration(signup_email, signup_password, signup_full_name, signup_organization, signup_role):
                     generated_otp = str(random.randint(100000, 999999))
-                    save_otp(normalize_email(email_val), generated_otp)
-                    st.session_state.pending_email = normalize_email(email_val)
+                    save_otp(signup_email, generated_otp)
+                    st.session_state.pending_email = normalize_email(signup_email)
                     st.session_state.pending_action = 'signup'
                     st.session_state.temp_user_data = {
-                        'email': normalize_email(email_val),
-                        'full_name': name_val,
-                        'organization': signup_organization.strip(),
-                        'role': signup_role.strip(),
+                        'email': normalize_email(signup_email),
+                        'full_name': signup_full_name,
+                        'organization': signup_organization,
+                        'role': signup_role,
                     }
                     with st.spinner("Delivering verification code..."):
-                        if send_otp_email(normalize_email(email_val), generated_otp):
+                        if send_otp_email(normalize_email(signup_email), generated_otp):
                             st.session_state.auth_step = 'otp_verify'
                             st.rerun()
                 else:
                     st.error("This email is already in use or already pending verification. Please try a different one.")
-    
-    # 3. SIGN IN PAGE
+        st.markdown('</div>', unsafe_allow_html=True)
+
     elif st.session_state.auth_step == 'signin':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
-        if st.button("⬅ Back", key="back_from_signin"):
+        if st.button("⬅ Back to Welcome", key="back_from_signin"):
             st.session_state.auth_step = 'welcome'
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Access Account</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card-subtitle">Enter your credentials to continue.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">Welcome Back</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle">Sign in to access your research vault.</div>', unsafe_allow_html=True)
 
         login_email = st.text_input("Email", key="login_user", placeholder="Enter your email")
         login_password = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
 
-        if st.button("Continue", use_container_width=True, key="login_btn"):
+        if st.button("Sign In", use_container_width=True, key="login_btn"):
             user = login_user(login_email, login_password)
             if user:
                 st.session_state.logged_in = True
@@ -829,27 +808,26 @@ if not st.session_state.logged_in:
                 st.error("Invalid email or password")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 4. GOOGLE AUTH PAGE
     elif st.session_state.auth_step == 'google':
         st.markdown('<div class="back-link">', unsafe_allow_html=True)
-        if st.button("⬅ Back", key="back_from_google"):
+        if st.button("⬅ Back to Welcome", key="back_from_google"):
             st.session_state.auth_step = 'welcome'
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
-        st.markdown('<div class="card-title">Verify Email</div>', unsafe_allow_html=True)
-        st.markdown('<div class="card-subtitle">Enter your email address to receive a code.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">Continue with Google</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle">Secure verification via email.</div>', unsafe_allow_html=True)
 
         google_email = st.text_input("Google Email", key="google_email", placeholder="name@gmail.com")
         google_name = st.text_input("Display Name", key="google_name", placeholder="Your name")
         
-        if st.button("Send Code", use_container_width=True, key="google_btn"):
+        if st.button("Request Security Code", use_container_width=True, key="google_btn"):
             if google_email:
                 user_info = check_email_exists(google_email)
                 if user_info:
                     generated_otp = str(random.randint(100000, 999999))
-                    save_otp(normalize_email(google_email), generated_otp)
+                    save_otp(google_email, generated_otp)
                     st.session_state.temp_user_data = user_info
                     st.session_state.pending_email = normalize_email(google_email)
                     st.session_state.pending_action = 'google_login'
@@ -858,12 +836,11 @@ if not st.session_state.logged_in:
                             st.session_state.auth_step = 'otp_verify'
                             st.rerun()
                 else:
-                    st.error("Account matching this email was not found.")
+                    st.error("Account matching this email was not found. Please sign up first.")
             else:
                 st.error("Please enter your Google email")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 5. OTP VERIFY PAGE
     elif st.session_state.auth_step == 'otp_verify':
         st.markdown('<div class="card-panel">', unsafe_allow_html=True)
         pending_action = st.session_state.get('pending_action', 'google_login')
@@ -876,7 +853,7 @@ if not st.session_state.logged_in:
 
         otp_val = st.text_input("Verification Code", max_chars=6, placeholder="Enter 6-digit code")
 
-        if st.button("Verify Code", use_container_width=True):
+        if st.button("Confirm & Complete Signup", use_container_width=True) if st.session_state.get('pending_action') == 'signup' else st.button("Confirm & Login", use_container_width=True):
             pending_email = st.session_state.get('pending_email')
             pending_action = st.session_state.get('pending_action', 'google_login')
             if pending_email and verify_otp(pending_email, otp_val):
@@ -886,7 +863,7 @@ if not st.session_state.logged_in:
                         st.session_state.pending_action = None
                         st.session_state.temp_user_data = None
                         st.session_state.auth_step = 'signin'
-                        st.success("Account created successfully.")
+                        st.success("Account created successfully. Please sign in or continue with Google.")
                         st.balloons()
                         st.rerun()
                     else:
@@ -908,6 +885,7 @@ if not st.session_state.logged_in:
 # --- MAIN APP (AFTER LOGIN) ---
 else:
     st.title("AddiComp Research Hub")
+    # Show research topic and, if available, the currently extracted paper's title and authors
     topic_text = "Mechanical characterization of 3D printed/additively manufactured composite materials."
     if st.session_state.get('auto_title'):
         paper_title = st.session_state.get('auto_title')
@@ -1070,15 +1048,18 @@ else:
         else:
             st.warning("No papers match your query inside the database.")
 
-    # --- TAB 3: SYSTEM STATISTICS ---
+    # --- TAB 3: SYSTEM STATISTICS (MATCHED TO YOUR SCREENSHOTS) ---
     with tab_stats:
         db_papers = get_filtered_papers("", "")
         
         if db_papers:
             df = pd.DataFrame([dict(p) for p in db_papers])
+            
+            # Clean dataframe values
             df['pub_year'] = df['pub_year'].fillna('Unknown')
             df['source_file'] = df['source_file'].fillna('unnamed_paper.pdf')
             
+            # Row 1: Papers by Year and Author Breakdown
             st.markdown("### Document Overview")
             fig_col1, fig_col2 = st.columns(2)
             
@@ -1092,8 +1073,14 @@ else:
                     labels={'pub_year': 'Year', 'Papers': 'Number of Papers'},
                     template='plotly_white'
                 )
-                fig_year.update_layout(xaxis_title='Year', yaxis_title='Number of Papers', bargap=0.2, margin=dict(t=50, b=40))
-                st.plotly_chart(fig_year, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                fig_year.update_layout(
+                    xaxis_title='Year',
+                    yaxis_title='Number of Papers',
+                    bargap=0.2,
+                    margin=dict(t=50, b=40)
+                )
+                plotly_config = {"staticPlot": True, "displayModeBar": False}
+                st.plotly_chart(fig_year, use_container_width=True, config=plotly_config)
                 
             with fig_col2:
                 author_expanded = df.assign(
@@ -1101,7 +1088,8 @@ else:
                 ).explode('Author')
                 author_expanded['Author'] = author_expanded['Author'].astype(str).str.strip()
                 author_expanded = author_expanded[author_expanded['Author'] != '']
-                author_group = author_expanded.groupby('Author').size().reset_index(name='Papers').sort_values('Papers', ascending=False).head(10)
+                author_group = author_expanded.groupby('Author').size().reset_index(name='Papers')
+                author_group = author_group.sort_values('Papers', ascending=False).head(10)
                 fig_author = px.pie(
                     author_group,
                     values='Papers',
@@ -1112,15 +1100,20 @@ else:
                 )
                 fig_author.update_traces(textposition='inside', textinfo='percent+label')
                 fig_author.update_layout(margin=dict(t=50, b=40))
-                st.plotly_chart(fig_author, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                plotly_config = {"staticPlot": True, "displayModeBar": False}
+                st.plotly_chart(fig_author, use_container_width=True, config=plotly_config)
                 
             st.markdown('---')
+            
+            # Row 2: Publication Overview Table
             st.markdown('### Publications Data Table')
             table_df = df.groupby(['pub_year', 'source_file']).size().reset_index(name='Papers')
             table_df.columns = ['Year', 'File', 'Papers']
             st.dataframe(table_df, use_container_width=True)
             
             st.markdown('---')
+            
+            # Row 3: Topic and Keyword Charts
             st.markdown('## Topic and Keyword Analysis')
             st.caption('Visualize your collection by top topics, publication year, and author distribution.')
             
@@ -1134,7 +1127,8 @@ else:
             
             if topic_data:
                 df_topic = pd.DataFrame(topic_data)
-                topic_group = df_topic.groupby('Topic').size().reset_index(name='Mentions').sort_values('Mentions', ascending=False).head(10)
+                topic_group = df_topic.groupby('Topic').size().reset_index(name='Mentions')
+                topic_group = topic_group.sort_values('Mentions', ascending=False).head(10)
                 topic_col1, topic_col2 = st.columns(2)
                 
                 with topic_col1:
@@ -1147,7 +1141,8 @@ else:
                         template='plotly_white'
                     )
                     fig_topic_bar.update_layout(xaxis_tickangle=-45, margin=dict(t=50, b=80))
-                    st.plotly_chart(fig_topic_bar, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_topic_bar, use_container_width=True, config=plotly_config)
                 
                 with topic_col2:
                     fig_topic_pie = px.pie(
@@ -1160,7 +1155,8 @@ else:
                     )
                     fig_topic_pie.update_traces(textposition='inside', textinfo='percent+label')
                     fig_topic_pie.update_layout(margin=dict(t=50, b=40))
-                    st.plotly_chart(fig_topic_pie, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_topic_pie, use_container_width=True, config=plotly_config)
             else:
                 st.info('No keyword/topic data available for charts.')
 
@@ -1198,7 +1194,8 @@ else:
                         legend=dict(orientation='h', yanchor='bottom', y=-0.3, xanchor='left', x=0),
                         margin=dict(t=50, b=80)
                     )
-                    st.plotly_chart(fig_kw_stacked, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_kw_stacked, use_container_width=True, config=plotly_config)
 
                 with fig_kw_col2:
                     kw_file_mentions = df_kws_expanded.groupby('Source File').size().reset_index(name='Mentions')
@@ -1212,7 +1209,8 @@ else:
                     )
                     fig_kw_donut.update_traces(textposition='inside', textinfo='percent+label')
                     fig_kw_donut.update_layout(margin=dict(t=50, b=40))
-                    st.plotly_chart(fig_kw_donut, use_container_width=True, config={"staticPlot": True, "displayModeBar": False})
+                    plotly_config = {"staticPlot": True, "displayModeBar": False}
+                    st.plotly_chart(fig_kw_donut, use_container_width=True, config=plotly_config)
 
                 st.markdown('---')
                 st.markdown('### Keywords Analysis Table')
