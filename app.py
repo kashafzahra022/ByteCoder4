@@ -636,12 +636,21 @@ AUTH_THEME_CSS = """
     color: #94a3b8;
     font-size: 13px;
     margin-top: 24px;
+}/* Disable Browser Suggestions Dropdown */
+input {
+    autocomplete: off !important;
 }
-/* Fix autofill value syncing for Streamlit inputs */
-input:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+
+/* Chrome autofill background & popup styling override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
     -webkit-text-fill-color: #0f172a !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
+
 </style>
 """
 
