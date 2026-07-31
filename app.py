@@ -755,16 +755,19 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-title">Create Your Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your details and we will send a verification code before creating your account.</div>', unsafe_allow_html=True)
 
-        # Indentation Fix Yahan Hai:
-        signup_full_name = st.text_input("Full Name ", key="field_fn_no_fill")
-        signup_email = st.text_input("Email Address ", key="field_em_no_fill")
-        signup_organization = st.text_input("Organization ", key="field_og_no_fill")
-        signup_role = st.text_input("Role ", key="field_rl_no_fill")
-        signup_password = st.text_input("Password ", type="password", key="field_pw_no_fill")
-        confirm_password = st.text_input("Confirm Password ", type="password", key="field_cp_no_fill")
+        # Form wrap: Is se Client autofill kare ya type kare, values missing nahi hongi!
+        with st.form(key="signup_form", clear_on_submit=False):
+            signup_full_name = st.text_input("Full Name", key="signup_fn")
+            signup_email = st.text_input("Email Address", key="signup_em")
+            signup_organization = st.text_input("Organization", key="signup_og")
+            signup_role = st.text_input("Role", key="signup_rl")
+            signup_password = st.text_input("Password", type="password", key="signup_pw")
+            confirm_password = st.text_input("Confirm Password", type="password", key="signup_cp")
 
-        if st.button("Send Verification Code", use_container_width=True, key="signup_btn"):
-            if not signup_full_name or not signup_email or not signup_password:
+            submit_btn = st.form_submit_button("Send Verification Code", use_container_width=True)
+
+        if submit_btn:
+            if not signup_full_name.strip() or not signup_email.strip() or not signup_password.strip():
                 st.error("Please fill all required fields")
             elif signup_password != confirm_password:
                 st.error("Passwords do not match")
