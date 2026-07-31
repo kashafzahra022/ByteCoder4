@@ -637,9 +637,9 @@ AUTH_THEME_CSS = """
     font-size: 13px;
     margin-top: 24px;
 }
-/* Chrome Autofill Override */
+/* Fix autofill value syncing for Streamlit inputs */
 input:-webkit-autofill {
-    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
     -webkit-text-fill-color: #0f172a !important;
 }
 </style>
