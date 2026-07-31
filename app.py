@@ -755,12 +755,13 @@ if not st.session_state.logged_in:
         st.markdown('<div class="card-title">Create Your Account</div>', unsafe_allow_html=True)
         st.markdown('<div class="card-subtitle">Enter your details and we will send a verification code before creating your account.</div>', unsafe_allow_html=True)
 
-        signup_full_name = st.text_input("Full Name", key="signup_full_name", placeholder="Enter your full name")
-        signup_email = st.text_input("Email Address", key="signup_email", placeholder="your.email@example.com")
-        signup_organization = st.text_input("Organization", key="signup_org", placeholder="University / Lab / Company")
-        signup_role = st.text_input("Role", key="signup_role", placeholder="Researcher / Student / Engineer")
-        signup_password = st.text_input("Password", type="password", key="signup_pass", placeholder="At least 6 characters")
-        confirm_password = st.text_input("Confirm Password", type="password", key="confirm_pass", placeholder="Re-enter password")
+        # Indentation Fix Yahan Hai:
+        signup_full_name = st.text_input("Full Name ", key="field_fn_no_fill")
+        signup_email = st.text_input("Email Address ", key="field_em_no_fill")
+        signup_organization = st.text_input("Organization ", key="field_og_no_fill")
+        signup_role = st.text_input("Role ", key="field_rl_no_fill")
+        signup_password = st.text_input("Password ", type="password", key="field_pw_no_fill")
+        confirm_password = st.text_input("Confirm Password ", type="password", key="field_cp_no_fill")
 
         if st.button("Send Verification Code", use_container_width=True, key="signup_btn"):
             if not signup_full_name or not signup_email or not signup_password:
